@@ -4,4 +4,4 @@ env/
 *.pyc
 *.txt
 __pycache__/
-
+results/
