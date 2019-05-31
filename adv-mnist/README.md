@@ -41,5 +41,16 @@ $ python adv_train.py --dataset mnist --mode l2 --eps 1.5 --num-pgd 40 --validat
 
 The checkpoint available in the folder ```results/``` was trained using the following command:
 ```shell
-$ python adv_train.py --dataset mnist --mode l2 --eps 1.5 --num-pgd 40 --validation-set --opt adam --sgd-lr 1e-4 --no-norm --save-str op --resume baseline_best --num-epochs 500 --save-iters 501 --random-step --op-attack --op-generator checkpoints/trained_vae_leakyrelu_20_500_500_784.pth --op-embed-feats 20 --op-iter 5 --op-weight 1e-2
+$ python adv_train.py --dataset mnist --mode l2 --eps 1.5 --num-pgd 40 --validation-set --opt adam --sgd-lr 1e-4 --no-norm --save-str op --resume baseline_215 --random-step --op-attack --op-generator checkpoints/trained_vae_leakyrelu_20_500_500_784.pth --op-embed-feats 20 --op-iter 5 --op-weight 1e-2
+```
+
+# Evaluation
+To evaluate robustness of the best baseline classifier:
+```shell
+$ python eval_network.py --dataset mnist --load-str baseline --mode l2 --num-steps 40 --eps 1.5 --random-step 
+```
+
+To evaluate the robustness of the best classifier trained with the ovepowered attack, run:
+```shell
+$ python eval_network.py --dataset mnist --load-str op --mode l2 --num-steps 40 --eps 1.5 --random-step
 ```
