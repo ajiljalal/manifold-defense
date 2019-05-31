@@ -1,0 +1,7 @@
+*.swp
+.*
+env/
+*.pyc
+*.txt
+__pycache__/
+
