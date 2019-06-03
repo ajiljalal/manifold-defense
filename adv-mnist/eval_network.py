@@ -62,12 +62,14 @@ for (images, labels) in testloader:
     pred_classes = pred_probs.argmax(1) # Shape: (BATCH_SIZE)
     num_correct += (pred_classes == labels).float().sum()
     num_total += labels.shape[0]
-    print(num_correct/num_total)
+    #print(num_correct/num_total)
 
     xx = (pred_classes != labels)
+    '''
     print(pred_classes[xx])
     print(labels[xx])
     print('')
+    '''
 print("###### EPOCH COMPLETE ######")
 print("Adversarial Accuracy: %f" % (num_correct/num_total).cpu().item())
 print("############################")
