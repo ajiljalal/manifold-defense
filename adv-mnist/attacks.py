@@ -29,7 +29,7 @@ def l2_projection(new_images, orig_images, eps):
     diff = new_images_flat - orig_images_flat
     diff_norms = ch.norm(diff, dim=-1, keepdim=True) 
     clip_mask = (diff_norms <= eps).float()
-    clipped_diffs = diff*clip_mask + eps * diff/(1e-10+diff_norms) * (1-clip_mask)
+    clipped_diffs = diff*clip_mask + eps * diff/(diff_norms) * (1-clip_mask)
     clipped_ims = orig_images_flat + clipped_diffs
     return clipped_ims.view(orig_images.shape)
 
@@ -50,7 +50,7 @@ def pgd_generic(new_net, orig_ims, correct_class, num_steps, lr, eps, use_noise,
         if mode == 'linf':
             attack_ims = attack_ims + (ch.rand_like(orig_ims)*2 - 1) * eps
         else:
-            scale = ch.Tensor([0.5])*eps# ch.rand(size=()) * eps
+            scale = ch.Tensor([0.1])*eps# ch.rand(size=()) * eps
             noise = ch.randn_like(orig_ims)
             attack_ims = attack_ims + normed(noise, new_shape) * scale.cuda()
     for _ in range(num_steps):
@@ -60,7 +60,7 @@ def pgd_generic(new_net, orig_ims, correct_class, num_steps, lr, eps, use_noise,
         if mode == 'linf':
             g = ch.sign(g)
         elif mode == 'l2':
-            g = g/(ch.norm(1e-10+g.view(g.shape[0], -1), dim=1, keepdim=True).view(*new_shape))
+            g = g/(ch.norm(1e-16+g.view(g.shape[0], -1), dim=1, keepdim=True).view(*new_shape))
         attack_ims = attack_ims + lr * g
         attack_ims = proj(attack_ims, orig_ims, eps)
         attack_ims = ch.clamp(attack_ims, 0, 1)
