@@ -53,16 +53,16 @@ for (images, labels) in testloader:
     #images = ae.encode(images)#encode(images)
     attack_args = [net, images.clone(), labels, NUM_STEPS, LR, EPS, args.random_step]
     attack_images = attack(*attack_args)
-    '''
+    #'''
     print("----")
     print(ch.norm((attack_images - images).view(images.shape[0],-1), dim=1))
     print("----")
-    '''
+    #'''
     pred_probs = net(attack_images) # Shape: (BATCH_SIZE x 10)
     pred_classes = pred_probs.argmax(1) # Shape: (BATCH_SIZE)
     num_correct += (pred_classes == labels).float().sum()
     num_total += labels.shape[0]
-    #print(num_correct/num_total)
+    print(num_correct/num_total)
 
     xx = (pred_classes != labels)
     '''
