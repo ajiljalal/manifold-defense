@@ -27,9 +27,12 @@ def l2_projection(new_images, orig_images, eps):
     new_images_flat = new_images.view(batch_size, -1)
     orig_images_flat = orig_images.view(batch_size, -1)
     diff = new_images_flat - orig_images_flat
-    diff_norms = ch.norm(diff, dim=-1, keepdim=True) 
-    clip_mask = (diff_norms <= eps).float()
-    clipped_diffs = diff*clip_mask + eps * diff/(diff_norms) * (1-clip_mask)
+    diff_norms = ch.norm(diff, dim=-1, keepdim=True)
+    # previous version can give division by zero
+    clipped_diffs = ch.where(diff_norms<=eps, diff, eps*diff/diff_norms)
+    #clip_mask = (diff_norms <= eps).float()
+    #clipped_diffs = diff*clip_mask + eps * diff/(diff_norms) * (1-clip_mask)
+    #print(clipped_diffs)
     clipped_ims = orig_images_flat + clipped_diffs
     return clipped_ims.view(orig_images.shape)
 
