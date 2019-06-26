@@ -13,14 +13,16 @@ ch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 BIG_BATCH_SIZE = 10#100
 BATCH_SIZE = 1
-R = 10
-L = 200
-I = int(L*0.8)
+R = 10 # number of restarts in defense-gan
+L = 200 # number of projection steps in defense-gan
+I = int(L*0.8) # in defense-gan, learning rate is decayed after these many steps
 LAM = 0.00025
 CRIT = nn.CrossEntropyLoss(reduce=False)
-LARGE_NUM = 10000
 RANGE = ch.range(0,BIG_BATCH_SIZE*R-1).long()
-SGD_LR = 10.
+SGD_LR = 10. #learning rate for sgd in defense-gan
+MOMENTUM = 0.7 #momentum for defense-gan
+
+# folder with different robustness norms for our attack
 folder_list = ['./intermediates_2.5','./intermediates_3.0','./intermediates_3.5', './intermediates_3.0_200', './intermediates_3.0_300']
 NUM_FOLDERS = len(folder_list)
 
@@ -36,12 +38,13 @@ testloader = data.DataLoader(
 		   transforms.ToTensor(),
 	   ])), batch_size=BIG_BATCH_SIZE, shuffle=False)
 
+# recreate defense-gan
 def latent_space_opt(ims, labels, num_steps=L):
     ims = ims.view(-1, 784)
     zhat = ch.randn(R*ims.shape[0], 128)
     targets = ims.repeat(R, 1)
     zhat.requires_grad_()
-    opt = optim.SGD([zhat], lr=SGD_LR, momentum=0.7)
+    opt = optim.SGD([zhat], lr=SGD_LR, momentum=MOMENTUM)
     lr_maker = StepLR(opt, step_size=I)
 
     for i in range(num_steps):
@@ -54,10 +57,14 @@ def latent_space_opt(ims, labels, num_steps=L):
         opt.step()
         lr_maker.step()
 
+    # take the big loss matrix and reshape it as
+    # (R, BIG_BATCH_SIZE*NUM_FOLDERS)
     distance_mat = ch.stack(loss_mat.chunk(R, 0), 0) 
     image_mat = ch.stack(gan(zhat).chunk(R, 0), 0)
     zh_mat = ch.stack(zhat.chunk(R, 0), 0)
+    # find index of the restart which gives smallest reconstruction error
     ind = (-distance_mat).argmax(0)
+    # for each image, select the best restart
     im_range = ch.range(0,ims.shape[0]-1).long()
     best_ims = image_mat[ind,im_range,:]
     best_zhs = zh_mat[ind,im_range,:]
@@ -70,10 +77,13 @@ def accuracy():
     total = 0.0
     i = 0
     try:
-        for ims_, targets in testloader:
-            targets = targets.cuda()
+        for ims_, labels in testloader:
+            labels = labels.cuda()
             all_ints = []
             all_orig = []
+            # attack for the i-th image is stored as batch_i_attack
+            # load the i-th image, which is given by 
+            # i = k*BIG_BATCH_SIZE+j , where k is the batch number, and j is the index within the batch
             for j in range(BIG_BATCH_SIZE//BATCH_SIZE):
                 for folder in folder_list: 
                     intermediates = ch.load("%s/batch_%d_attack" % (folder,i,))
@@ -83,30 +93,28 @@ def accuracy():
                 i += 1
             intermediates = ch.cat(all_ints, 0)
             originals = ch.cat(all_orig, 0)
-            images, _ = latent_space_opt(intermediates.view(-1, 784).cuda(), targets, num_steps=L)
+            # get results from defense-gan projection
+            images, _ = latent_space_opt(intermediates.view(-1, 784).cuda(), labels, num_steps=L)
             with ch.no_grad():
                 out = cla(images.view(-1,1,28,28).cuda())
                 
                 preds = out.argmax(1)
+                # reshape predictions as (BIG_BATCH_SIZE, NUM_FOLDERS)
                 preds_repeat = ch.stack(preds.chunk(BIG_BATCH_SIZE),0)
-                
-                targets_repeat = ch.stack(targets.repeat(NUM_FOLDERS).chunk(NUM_FOLDERS),1)
-                print(preds_repeat, targets_repeat)
-                correct = preds_repeat == targets_repeat
-
+                # reshape labels as (BIG_BATCH_SIZE, NUM_FOLDERS)
+                labels_repeat = ch.stack(labels.repeat(NUM_FOLDERS).chunk(NUM_FOLDERS),1)
+                correct = preds_repeat == labels_repeat
+                # for each image, check if the predictions are correct across all attack folders
                 total_correct += ch.all(correct,1).float().sum()
                 total += preds_repeat.shape[0]
-
+                # find norm of difference between the attack and original
                 norms = (intermediates-originals.view(originals.shape[0], -1)).float().pow(2).sum(-1).pow(0.5)
+                # reshape as (BIG_BATCH_SIZE, NUM_FOLDERS)
                 norms = ch.stack(norms.chunk(BIG_BATCH_SIZE),0)
-                print(norms)
-                print(norms.shape)
+                # only count the attacks which are within the norm budget
                 total_incorrect_inbds += ch.any((1-correct)*(norms<4),1).float().sum()
-                #total_correct += (preds == targets).float().sum()
-                #norms = (intermediates-originals.view(BIG_BATCH_SIZE, -1)).float().pow(2).sum(-1).pow(0.5)
-                #total_incorrect_inbds += ((1 - (preds == targets).float())*((norms < 4).float())).sum()
-                #total += preds.shape[0]
-            print(total_correct/total, total_incorrect_inbds/total)
+                print(total_correct/total, total_incorrect_inbds/total)
+            
     except:
         return total, total_correct/total, total_incorrect_inbds/total
 
