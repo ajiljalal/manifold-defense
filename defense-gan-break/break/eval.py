@@ -9,7 +9,6 @@ from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
 #from models import Classifier
 
-#ch.manual_seed(0)#11241990)
 ch.set_default_tensor_type('torch.cuda.FloatTensor')
 
 BIG_BATCH_SIZE = 10#100
@@ -22,7 +21,7 @@ CRIT = nn.CrossEntropyLoss(reduce=False)
 LARGE_NUM = 10000
 RANGE = ch.range(0,BIG_BATCH_SIZE*R-1).long()
 SGD_LR = 10.
-folder_list = ['./intermediates_2.5','./intermediates_3.0','./intermediates_3.5', 'intermediates_3.0_200', './intermediates_3.0_300']
+folder_list = ['./intermediates_2.5','./intermediates_3.0','./intermediates_3.5', './intermediates_3.0_200', './intermediates_3.0_300']
 NUM_FOLDERS = len(folder_list)
 
 gan = nn.DataParallel(ch.load("ckpts/netG")).cuda()
